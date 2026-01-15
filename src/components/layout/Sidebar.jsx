@@ -170,6 +170,8 @@ export function Sidebar({ collapsed, onToggleCollapsed }) {
                   onMouseEnter={() => prefetch_(it)}
                   onFocus={() => prefetch_(it)}
                   onPointerDown={() => prefetch_(it)}
+                  aria-label={it.label}
+                  data-tooltip={it.label}
                 >
                   <span className="sidebar-linkIcon" aria-hidden="true">
                     {'\u2022'}

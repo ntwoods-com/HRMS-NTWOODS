@@ -27,6 +27,7 @@ const SlaConfigPage = lazy(() => import('./pages/SlaConfigPage').then((m) => ({ 
 const EmployeeProfilePage = lazy(() => import('./pages/EmployeeProfilePage').then((m) => ({ default: m.EmployeeProfilePage })));
 const RejectionLogPage = lazy(() => import('./pages/RejectionLogPage').then((m) => ({ default: m.RejectionLogPage })));
 const EmployeeTrainingPage = lazy(() => import('./pages/EmployeeTrainingPage').then((m) => ({ default: m.EmployeeTrainingPage })));
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage })));
 
 function RouteFallback() {
   const { isAuthenticated } = useAuth();
@@ -77,6 +78,14 @@ export function App() {
             element={
               <ProtectedRoute portalKey="PORTAL_REJECTION_LOG" allowedRoles={['ADMIN', 'EA', 'HR']}>
                 <RejectionLogPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/analytics"
+            element={
+              <ProtectedRoute portalKey="PORTAL_ANALYTICS" allowedRoles={['ADMIN', 'HR']}>
+                <AnalyticsPage />
               </ProtectedRoute>
             }
           />

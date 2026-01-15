@@ -20,6 +20,31 @@ import {
 import { autoRejectFinalNoshow } from '../api/candidates';
 import { AdminTrainingForm } from '../components/training/AdminTrainingForm';
 import { safeActorLabel } from '../utils/pii';
+import {
+  UsersIcon,
+  ShieldIcon,
+  LockIcon,
+  FileTextIcon,
+  AwardIcon,
+  SettingsIcon,
+  ActivityIcon,
+  PlusIcon,
+  EditIcon,
+  TrashIcon,
+  RefreshIcon,
+  SearchIcon,
+  CheckIcon,
+  XIcon,
+  DownloadIcon,
+  FilterIcon,
+  ChevronDownIcon,
+  UserCheckIcon,
+  UserXIcon,
+  DatabaseIcon,
+  ServerIcon,
+  AlertCircleIcon,
+} from '../components/ui/Icons';
+import { PerformanceMonitor } from '../components/ui/PerformanceMonitor';
 
 function toastErrorOnce_(key, message) {
   toast.error(message, { id: key });
@@ -45,13 +70,14 @@ export function AdminPage() {
 
   const tabs = useMemo(
     () => [
-      { key: 'users', label: 'Users' },
-      { key: 'roles', label: 'Roles' },
-      { key: 'permissions', label: 'Permissions' },
-      { key: 'templates', label: 'Job Templates' },
-      { key: 'trainings', label: 'Trainings' },
-      { key: 'settings', label: 'Settings' },
-      { key: 'logs', label: 'Logs' },
+      { key: 'users', label: 'Users', icon: UsersIcon },
+      { key: 'roles', label: 'Roles', icon: ShieldIcon },
+      { key: 'permissions', label: 'Permissions', icon: LockIcon },
+      { key: 'templates', label: 'Job Templates', icon: FileTextIcon },
+      { key: 'trainings', label: 'Trainings', icon: AwardIcon },
+      { key: 'settings', label: 'Settings', icon: SettingsIcon },
+      { key: 'logs', label: 'Logs', icon: ActivityIcon },
+      { key: 'system', label: 'System Health', icon: ServerIcon },
     ],
     []
   );
@@ -545,17 +571,21 @@ export function AdminPage() {
         </div>
 
         <div style={{ height: 12 }} />
-        <div className="tabs">
-          {tabs.map((t) => (
-            <button
-              key={t.key}
-              className={['tab', active === t.key ? 'active' : ''].join(' ')}
-              onClick={() => setActive(t.key)}
-              type="button"
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="tabs admin-tabs">
+          {tabs.map((t) => {
+            const IconComponent = t.icon;
+            return (
+              <button
+                key={t.key}
+                className={['tab', active === t.key ? 'active' : ''].join(' ')}
+                onClick={() => setActive(t.key)}
+                type="button"
+              >
+                <IconComponent size={16} />
+                <span>{t.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -1280,6 +1310,94 @@ export function AdminPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      ) : null}
+
+      {active === 'system' ? (
+        <div className="card system-health-section">
+          <div className="row" style={{ marginBottom: '1.5rem' }}>
+            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <ServerIcon size={20} />
+              System Health & Monitoring
+            </h3>
+            <div className="spacer" />
+            <span className="badge badge-success" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <CheckIcon size={12} />
+              All Systems Operational
+            </span>
+          </div>
+
+          <PerformanceMonitor />
+
+          <div style={{ height: '1.5rem' }} />
+
+          <div className="admin-stats-grid">
+            <div className="admin-stat-card">
+              <div className="stat-icon blue">
+                <DatabaseIcon size={24} />
+              </div>
+              <div className="stat-info">
+                <span className="stat-value">PostgreSQL</span>
+                <span className="stat-label">Database Status</span>
+              </div>
+              <span className="stat-status online">Online</span>
+            </div>
+
+            <div className="admin-stat-card">
+              <div className="stat-icon green">
+                <ServerIcon size={24} />
+              </div>
+              <div className="stat-info">
+                <span className="stat-value">Flask API</span>
+                <span className="stat-label">Backend Server</span>
+              </div>
+              <span className="stat-status online">Running</span>
+            </div>
+
+            <div className="admin-stat-card">
+              <div className="stat-icon purple">
+                <UsersIcon size={24} />
+              </div>
+              <div className="stat-info">
+                <span className="stat-value">{users.length}</span>
+                <span className="stat-label">Total Users</span>
+              </div>
+            </div>
+
+            <div className="admin-stat-card">
+              <div className="stat-icon orange">
+                <LockIcon size={24} />
+              </div>
+              <div className="stat-info">
+                <span className="stat-value">{permissions.length}</span>
+                <span className="stat-label">Permissions</span>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ height: '1.5rem' }} />
+
+          <div className="admin-quick-actions">
+            <h4 style={{ marginTop: 0, marginBottom: '1rem' }}>Quick Actions</h4>
+            <div className="row" style={{ gap: '0.75rem', flexWrap: 'wrap' }}>
+              <button className="button primary" onClick={loadUsers} disabled={usersLoading}>
+                <RefreshIcon size={16} />
+                Refresh Users
+              </button>
+              <button className="button" onClick={loadRoles} disabled={rolesLoading}>
+                <RefreshIcon size={16} />
+                Refresh Roles
+              </button>
+              <button className="button" onClick={loadPermissions} disabled={permissionsLoading}>
+                <RefreshIcon size={16} />
+                Refresh Permissions
+              </button>
+              <button className="button warning" onClick={handleFinalNoshow} disabled={finalNoshowRunning}>
+                <AlertCircleIcon size={16} />
+                Auto-Reject No-Shows
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

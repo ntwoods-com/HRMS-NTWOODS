@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 
 import { AppLayout } from '../components/layout/AppLayout';
 import { useAuth } from '../auth/useAuth';
+import { DashboardWidgets } from '../components/ui/DashboardWidgets';
 import {
   finalInterviewList,
   hrFinalHoldList,
@@ -296,6 +297,20 @@ export function DashboardPage() {
         <div className="spacer" />
         {overviewLoading && <span className="badge blue">Syncing...</span>}
       </div>
+
+      {/* Role-based Dashboard Widgets */}
+      <DashboardWidgets 
+        customData={{
+          'active-candidates': overview?.hr ? { value: (overview.hr.precall || 0) + (overview.hr.inperson || 0) + (overview.hr.finalInterview || 0) } : undefined,
+          'pending-approvals': overview?.owner ? { value: overview.owner.approvals || 0 } : undefined,
+          'interviews-today': overview?.hr ? { value: overview.hr.finalInterview || 0 } : undefined,
+        }}
+        onWidgetClick={(widget) => {
+          // Navigate based on widget type
+          if (widget.id === 'pending-approvals') navigate('/owner');
+          if (widget.id === 'active-candidates') navigate('/hr/precall');
+        }}
+      />
 
       {/* Requirements Section */}
       {overview?.requirements && (

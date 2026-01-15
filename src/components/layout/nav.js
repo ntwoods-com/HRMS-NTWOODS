@@ -37,8 +37,11 @@ export function getNavSections() {
     },
     {
       key: 'logs',
-      title: 'Logs',
-      items: [{ key: 'rejections', label: 'Rejection Log', to: '/rejections', portalKey: 'PORTAL_REJECTION_LOG', roles: ['EA', 'HR', 'ADMIN'], preload: () => import('../../pages/RejectionLogPage.jsx') }],
+      title: 'Logs & Analytics',
+      items: [
+        { key: 'rejections', label: 'Rejection Log', to: '/rejections', portalKey: 'PORTAL_REJECTION_LOG', roles: ['EA', 'HR', 'ADMIN'], preload: () => import('../../pages/RejectionLogPage.jsx') },
+        { key: 'analytics', label: 'Analytics', to: '/analytics', portalKey: 'PORTAL_ANALYTICS', roles: ['HR', 'ADMIN'], preload: () => import('../../pages/AnalyticsPage.jsx') },
+      ],
     },
     {
       key: 'employee',

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../utils/cn';
 import { useAuth } from '../../auth/useAuth';
 import { Badge } from '../ui/Badge';
+import { Icon } from '../ui/Icons';
 import { getNavSections } from './nav';
 
 function normalizeRole_(role) {
@@ -166,9 +167,16 @@ export function Sidebar({ collapsed, onToggleCollapsed }) {
       </div>
 
       <nav className="sidebar-nav">
-        {visibleSections.map((s) => (
+        {visibleSections.map((s, sIdx) => (
           <div key={s.key} className="sidebar-section">
-            {!collapsed ? <div className="sidebar-sectionTitle">{s.title}</div> : null}
+            {!collapsed ? (
+              <div className="sidebar-sectionTitle">{s.title}</div>
+            ) : (
+              <div className="sidebar-sectionDivider" aria-hidden="true">
+                {sIdx > 0 ? <span className="sidebar-sectionDot" /> : null}
+                <span className="sidebar-sectionTooltip">{s.title}</span>
+              </div>
+            )}
             <div className="sidebar-links">
               {s.items.map((it) => {
                 const isActive = isActivePath_(pathname, it.to);
@@ -182,13 +190,17 @@ export function Sidebar({ collapsed, onToggleCollapsed }) {
                     onPointerDown={() => prefetch_(it)}
                     aria-label={it.label}
                     aria-current={isActive ? 'page' : undefined}
-                    title={collapsed ? it.label : undefined}
                     onClick={() => navigate(it.to)}
                   >
                     <span className="sidebar-linkIcon" aria-hidden="true">
-                      {'\u2022'}
+                      <Icon name={it.icon || 'file'} size={collapsed ? 18 : 16} />
                     </span>
                     {!collapsed ? <span className="sidebar-linkLabel">{it.label}</span> : null}
+                    {collapsed ? (
+                      <span className="sidebar-tooltip" role="tooltip">
+                        {it.label}
+                      </span>
+                    ) : null}
                   </button>
                 );
               })}

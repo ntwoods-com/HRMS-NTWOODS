@@ -153,18 +153,21 @@ body {
   color: var(--gray-900);
 }
 .sidebar-linkIcon {
-  width: 18px;
-  height: 18px;
-  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 8px;
   background: var(--gray-100);
   color: var(--gray-600);
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
-  font-size: 12px;
 }
 .sidebar-linkIcon .icon {
   display: block;
+  width: 18px;
+  height: 18px;
 }
 .sidebar-link:hover .sidebar-linkIcon {
   background: rgba(37, 99, 235, 0.12);
@@ -180,9 +183,14 @@ body {
   position: relative;
 }
 .sidebar.is-collapsed .sidebar-linkIcon {
-  width: 26px;
-  height: 26px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
   border-radius: 10px;
+}
+.sidebar.is-collapsed .sidebar-linkIcon .icon {
+  width: 20px;
+  height: 20px;
 }
 
 /* Collapsed sidebar tooltips */

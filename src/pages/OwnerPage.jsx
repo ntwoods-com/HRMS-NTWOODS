@@ -9,6 +9,8 @@ import { Collapsible } from '../components/ui/Collapsible';
 import { validateScheduleDateTimeLocal } from '../utils/scheduling';
 import { openFile } from '../utils/files';
 import { candidateDisplayName } from '../utils/pii';
+import { CvPreviewModal } from '../components/ui/CvPreviewModal';
+import { BulkActionBar, BulkProgressModal, SelectAllCheckbox } from '../components/ui/BulkActionBar';
 
 function fmtDateTime(value) {
   if (!value) return '';
@@ -90,6 +92,14 @@ export function OwnerPage() {
   const [holdUntil, setHoldUntil] = useState('');
   const [busyKey, setBusyKey] = useState('');
 
+  // CV Preview Modal state
+  const [cvPreview, setCvPreview] = useState({ open: false, candidate: null });
+
+  // Bulk Selection states
+  const [selectedApprove, setSelectedApprove] = useState({});
+  const [selectedFinal, setSelectedFinal] = useState({});
+  const [bulkProgress, setBulkProgress] = useState({ open: false, title: '', current: 0, total: 0, errors: [] });
+
   async function loadCandidateTests_(list) {
     if (!allowAction_('CANDIDATE_TESTS_GET', ['OWNER', 'ADMIN'])) return;
     if (!Array.isArray(list) || list.length === 0) {
@@ -146,13 +156,124 @@ export function OwnerPage() {
     setHoldUntil('');
   }
 
+  // Open CV in modal (same page)
   function viewCv(candidate) {
     if (!candidate?.cvFileId) {
       toast.error('CV not available');
       return;
     }
-    const ok = openFile(candidate.cvFileId, token);
-    if (!ok) toast.error('Unable to open CV');
+    setCvPreview({ open: true, candidate });
+  }
+
+  // Bulk selection helpers
+  function toggleSelectApprove(candidateId, checked) {
+    setSelectedApprove(prev => {
+      const next = { ...prev };
+      if (checked) next[candidateId] = true;
+      else delete next[candidateId];
+      return next;
+    });
+  }
+
+  function toggleSelectFinal(candidateId, checked) {
+    setSelectedFinal(prev => {
+      const next = { ...prev };
+      if (checked) next[candidateId] = true;
+      else delete next[candidateId];
+      return next;
+    });
+  }
+
+  function selectAllApprove(checked) {
+    if (checked) {
+      const all = {};
+      approveItems.forEach(c => { all[c.candidateId] = true; });
+      setSelectedApprove(all);
+    } else {
+      setSelectedApprove({});
+    }
+  }
+
+  function selectAllFinal(checked) {
+    if (checked) {
+      const all = {};
+      finalItems.forEach(c => { all[c.candidateId] = true; });
+      setSelectedFinal(all);
+    } else {
+      setSelectedFinal({});
+    }
+  }
+
+  // Bulk approve action
+  async function bulkApprove() {
+    const selectedIds = Object.keys(selectedApprove);
+    if (selectedIds.length === 0) {
+      toast.error('Select candidates first');
+      return;
+    }
+
+    setBulkProgress({ open: true, title: 'Bulk Approving...', current: 0, total: selectedIds.length, errors: [] });
+
+    let errors = [];
+    for (let i = 0; i < selectedIds.length; i++) {
+      const candidateId = selectedIds[i];
+      const candidate = approveItems.find(c => c.candidateId === candidateId);
+      if (!candidate) continue;
+
+      setBulkProgress(prev => ({ ...prev, current: i + 1 }));
+      
+      try {
+        await ownerDecide(token, {
+          requirementId: candidate.requirementId,
+          candidateId,
+          decision: 'APPROVE_WALKIN',
+          remark: 'Bulk approved',
+        });
+      } catch (e) {
+        errors.push({ id: candidateId, message: e?.message || 'Failed' });
+      }
+    }
+
+    setBulkProgress(prev => ({ ...prev, errors }));
+    toast.success(`Bulk approved: ${selectedIds.length - errors.length}/${selectedIds.length}`);
+    setSelectedApprove({});
+    await refresh();
+  }
+
+  // Bulk final select action
+  async function bulkFinalSelect() {
+    const selectedIds = Object.keys(selectedFinal);
+    if (selectedIds.length === 0) {
+      toast.error('Select candidates first');
+      return;
+    }
+
+    setBulkProgress({ open: true, title: 'Bulk Selecting...', current: 0, total: selectedIds.length, errors: [] });
+
+    let errors = [];
+    for (let i = 0; i < selectedIds.length; i++) {
+      const candidateId = selectedIds[i];
+      const candidate = finalItems.find(c => c.candidateId === candidateId);
+      if (!candidate) continue;
+
+      setBulkProgress(prev => ({ ...prev, current: i + 1 }));
+      
+      try {
+        await ownerFinalDecide(token, {
+          requirementId: candidate.requirementId,
+          candidateId,
+          decision: 'SELECT',
+          remark: 'Bulk selected',
+        });
+      } catch (e) {
+        errors.push({ id: candidateId, message: e?.message || 'Failed' });
+      }
+    }
+
+    setBulkProgress(prev => ({ ...prev, errors }));
+    toast.success(`Bulk selected: ${selectedIds.length - errors.length}/${selectedIds.length}`);
+    setSelectedFinal({});
+    await refresh();
   }
 
   async function decideOwner(decision) {
@@ -358,55 +479,94 @@ export function OwnerPage() {
                   <div className="empty-state-text">No candidates pending approval</div>
                 </div>
               ) : (
-                <div style={{ display: 'grid', gap: 10 }}>
-                  {approveItems.map((c) => {
-                    const st = String(c.status || '').toUpperCase();
-                    const isHold = st === 'OWNER_HOLD';
-                    const holdText = c.holdUntil ? new Date(c.holdUntil).toLocaleString() : '';
+                <>
+                  {/* Select All */}
+                  <div style={{ marginBottom: 12, padding: '8px 12px', background: 'var(--gray-50)', borderRadius: 8 }}>
+                    <SelectAllCheckbox
+                      checked={Object.keys(selectedApprove).length === approveItems.length}
+                      indeterminate={Object.keys(selectedApprove).length > 0 && Object.keys(selectedApprove).length < approveItems.length}
+                      onChange={selectAllApprove}
+                      label={`Select All (${approveItems.length})`}
+                    />
+                  </div>
 
-                    return (
-                      <div key={c.candidateId} className="card" style={{ background: '#fff', border: '1px solid var(--gray-200)' }}>
-                        <div className="row" style={{ justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                          <div>
-                            <div style={{ fontWeight: 700, fontSize: '15px' }}>
-                              {candidateDisplayName(c) || c.candidateId}
-                              {candidateDisplayName(c) && c.candidateId ? (
-                                <span className="small" style={{ fontWeight: 400, marginLeft: 8, color: 'var(--gray-500)' }}>
-                                  ({c.candidateId})
-                                </span>
-                              ) : null}
-                            </div>
-                            <div className="small" style={{ color: 'var(--gray-500)', marginTop: 2 }}>
-                              {c.jobRole || '-'} · {c.source || '-'}
-                            </div>
-                            <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                              <span className="badge">Req: {c.requirementId}</span>
-                              <span className="badge" style={{ background: isHold ? '#f59e0b' : 'var(--primary)', color: '#fff' }}>
-                                {st}
-                              </span>
-                            </div>
-                            {isHold && holdText && (
-                              <div className="small" style={{ marginTop: 6, color: 'var(--gray-600)' }}>
-                                ⏰ Hold deadline: {holdText}
+                  <div style={{ display: 'grid', gap: 10 }}>
+                    {approveItems.map((c) => {
+                      const st = String(c.status || '').toUpperCase();
+                      const isHold = st === 'OWNER_HOLD';
+                      const holdText = c.holdUntil ? new Date(c.holdUntil).toLocaleString() : '';
+                      const isSelected = !!selectedApprove[c.candidateId];
+
+                      return (
+                        <div 
+                          key={c.candidateId} 
+                          className="card" 
+                          style={{ 
+                            background: isSelected ? 'rgba(59, 130, 246, 0.05)' : '#fff', 
+                            border: isSelected ? '2px solid var(--primary)' : '1px solid var(--gray-200)',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <div className="row" style={{ justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                              {/* Checkbox */}
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) => toggleSelectApprove(c.candidateId, e.target.checked)}
+                                style={{ width: 18, height: 18, marginTop: 4, cursor: 'pointer' }}
+                              />
+                              <div>
+                                <div style={{ fontWeight: 700, fontSize: '15px' }}>
+                                  {candidateDisplayName(c) || c.candidateId}
+                                  {candidateDisplayName(c) && c.candidateId ? (
+                                    <span className="small" style={{ fontWeight: 400, marginLeft: 8, color: 'var(--gray-500)' }}>
+                                      ({c.candidateId})
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <div className="small" style={{ color: 'var(--gray-500)', marginTop: 2 }}>
+                                  {c.jobRole || '-'} · {c.source || '-'}
+                                </div>
+
+                                {/* Extra candidate details */}
+                                <div style={{ marginTop: 6, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 4 }}>
+                                  {c.phone && <div className="small">📞 {c.phone}</div>}
+                                  {c.email && <div className="small">✉️ {c.email}</div>}
+                                  {c.experience && <div className="small">💼 Exp: {c.experience}</div>}
+                                  {c.currentSalary && <div className="small">💰 Current: {c.currentSalary}</div>}
+                                  {c.expectedSalary && <div className="small">💵 Expected: {c.expectedSalary}</div>}
+                                </div>
+
+                                <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                  <span className="badge">Req: {c.requirementId}</span>
+                                  <span className="badge" style={{ background: isHold ? '#f59e0b' : 'var(--primary)', color: '#fff' }}>
+                                    {st}
+                                  </span>
+                                </div>
+                                {isHold && holdText && (
+                                  <div className="small" style={{ marginTop: 6, color: 'var(--gray-600)' }}>
+                                    ⏰ Hold deadline: {holdText}
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
+                            </div>
 
-                          <div className="action-grid">
-                            <button className="button" type="button" onClick={() => viewCv(c)}>
-                              📄 CV
-                            </button>
-                            {isHold ? (
-                              <button
-                                className="button"
-                                type="button"
-                                onClick={() => revertHold(c)}
-                                disabled={!!busyKey || !allowAction_('HOLD_REVERT', ['OWNER', 'ADMIN'])}
-                              >
-                                {busyKey === `${c.candidateId}:REVERT` ? <Spinner size={14} /> : null}
-                                Revert
+                            <div className="action-grid">
+                              <button className="button" type="button" onClick={() => viewCv(c)}>
+                                📄 CV
                               </button>
-                            ) : (
+                              {isHold ? (
+                                <button
+                                  className="button"
+                                  type="button"
+                                  onClick={() => revertHold(c)}
+                                  disabled={!!busyKey || !allowAction_('HOLD_REVERT', ['OWNER', 'ADMIN'])}
+                                >
+                                  {busyKey === `${c.candidateId}:REVERT` ? <Spinner size={14} /> : null}
+                                  Revert
+                                </button>
+                              ) : (
                               <button
                                 className="button primary"
                                 type="button"
@@ -427,7 +587,8 @@ export function OwnerPage() {
                       </div>
                     );
                   })}
-                </div>
+                  </div>
+                </>
               )}
             </Collapsible>
           ) : (
@@ -444,113 +605,157 @@ export function OwnerPage() {
                   <div className="empty-state-text">No candidates pending final decision</div>
                 </div>
               ) : (
-                <div style={{ display: 'grid', gap: 10 }}>
-                  {finalItems.map((c) => {
-                    const reqTests = testsByCandidate?.[c.candidateId]?.requiredTests ?? [];
-                    return (
-                      <div key={c.candidateId} className="card" style={{ background: '#fff', border: '1px solid var(--gray-200)' }}>
-                        <div className="row" style={{ justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                          <div style={{ minWidth: 280, flex: 1 }}>
-                            <div style={{ fontWeight: 700, fontSize: '15px' }}>
-                              {candidateDisplayName(c) || c.candidateId}
-                              {candidateDisplayName(c) && c.candidateId ? (
-                                <span className="small" style={{ fontWeight: 400, marginLeft: 8, color: 'var(--gray-500)' }}>
-                                  ({c.candidateId})
-                                </span>
-                              ) : null}
-                            </div>
-                            <div className="small" style={{ color: 'var(--gray-500)', marginTop: 2 }}>
-                              {c.jobTitle ? `${c.jobTitle} · ` : ''}{c.jobRole || '-'}
-                            </div>
-                            <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                              <span className="badge">Req: {c.requirementId}</span>
-                              <span className="badge" style={{ background: 'var(--primary)', color: '#fff' }}>
-                                Final Decision
-                              </span>
-                            </div>
+                <>
+                  {/* Select All */}
+                  <div style={{ marginBottom: 12, padding: '8px 12px', background: 'var(--gray-50)', borderRadius: 8 }}>
+                    <SelectAllCheckbox
+                      checked={Object.keys(selectedFinal).length === finalItems.length}
+                      indeterminate={Object.keys(selectedFinal).length > 0 && Object.keys(selectedFinal).length < finalItems.length}
+                      onChange={selectAllFinal}
+                      label={`Select All (${finalItems.length})`}
+                    />
+                  </div>
 
-                            {/* Scores */}
-                            <div style={{ marginTop: 12, padding: '10px 12px', background: 'var(--gray-100)', borderRadius: 'var(--radius)' }}>
-                              <div className="small" style={{ fontWeight: 600, marginBottom: 6 }}>Scores</div>
-                              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                <span
-                                  className="badge"
-                                  style={{
-                                    background: String(c.onlineTestResult || '').toUpperCase() === 'PASS' ? '#22c55e' : String(c.onlineTestResult || '').toUpperCase() === 'FAIL' ? '#ef4444' : undefined,
-                                    color: String(c.onlineTestResult || '').toUpperCase() ? '#fff' : undefined,
-                                  }}
-                                >
-                                  Online Test: {(c.onlineTestScore === '' || c.onlineTestScore == null) ? '-' : c.onlineTestScore}{c.onlineTestResult ? ` (${String(c.onlineTestResult).toUpperCase()})` : ''}
-                                </span>
-                                {String(c.onlineTestResult || '').toUpperCase() === 'FAIL' && isContinued_(c, 'ONLINE_TEST') ? (
-                                  <span className="badge" style={{ background: '#f59e0b', color: '#fff' }}>Continued by HR</span>
-                                ) : null}
-                                {c.preInterviewMarks && <span className="badge">Pre-interview: {c.preInterviewMarks}</span>}
-                                {c.inPersonMarks && <span className="badge">In-person: {c.inPersonMarks}</span>}
-                              </div>
+                  <div style={{ display: 'grid', gap: 10 }}>
+                    {finalItems.map((c) => {
+                      const reqTests = testsByCandidate?.[c.candidateId]?.requiredTests ?? [];
+                      const isSelected = !!selectedFinal[c.candidateId];
 
-                              <div className="small" style={{ marginTop: 8, fontWeight: 600 }}>Required Tests</div>
-                              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
-                                {Array.isArray(reqTests) && reqTests.length ? (
-                                  reqTests.map((rt) => (
-                                    <span key={rt.testKey} className="badge" style={badgeForStatus_(rt.status)}>
-                                      {rt.label || rt.testKey}: {statusLabel_(rt.status)}
-                                      {rt.marksNumber != null ? ` (${rt.marksNumber}/10)` : ''}
+                      return (
+                        <div 
+                          key={c.candidateId} 
+                          className="card" 
+                          style={{ 
+                            background: isSelected ? 'rgba(59, 130, 246, 0.05)' : '#fff', 
+                            border: isSelected ? '2px solid var(--primary)' : '1px solid var(--gray-200)',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <div className="row" style={{ justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', minWidth: 280, flex: 1 }}>
+                              {/* Checkbox */}
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) => toggleSelectFinal(c.candidateId, e.target.checked)}
+                                style={{ width: 18, height: 18, marginTop: 4, cursor: 'pointer' }}
+                              />
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 700, fontSize: '15px' }}>
+                                  {candidateDisplayName(c) || c.candidateId}
+                                  {candidateDisplayName(c) && c.candidateId ? (
+                                    <span className="small" style={{ fontWeight: 400, marginLeft: 8, color: 'var(--gray-500)' }}>
+                                      ({c.candidateId})
                                     </span>
-                                  ))
-                                ) : (
-                                  <span className="badge">No required tests</span>
-                                )}
-                              </div>
-
-                              {Array.isArray(reqTests) && reqTests.length ? (
-                                <div className="small" style={{ marginTop: 6, display: 'grid', gap: 4 }}>
-                                  {reqTests.map((rt) => (
-                                    <div key={rt.testKey}>
-                                      <span style={{ fontWeight: 600 }}>{rt.label || rt.testKey}</span>
-                                      {rt.filledAt ? ` · Filled: ${rt.filledBy || '-'} (${fmtDateTime(rt.filledAt)})` : ''}
-                                      {rt.reviewedAt ? ` · Reviewed: ${rt.reviewedBy || '-'} (${fmtDateTime(rt.reviewedAt)})` : ''}
-                                      {rt.remarks ? ` · ${rt.remarks}` : ''}
-                                    </div>
-                                  ))}
+                                  ) : null}
                                 </div>
-                              ) : null}
-                            </div>
-                          </div>
+                                <div className="small" style={{ color: 'var(--gray-500)', marginTop: 2 }}>
+                                  {c.jobTitle ? `${c.jobTitle} · ` : ''}{c.jobRole || '-'}
+                                </div>
 
-                          <div className="action-grid" style={{ minWidth: 180 }}>
-                            <button className="button" type="button" onClick={() => viewCv(c)}>
-                              📄 CV
-                            </button>
-                            <button
-                              className="button primary"
-                              type="button"
-                              onClick={() => finalSelect(c)}
-                              disabled={!!busyKey || !allowAction_('OWNER_FINAL_DECIDE', ['OWNER', 'ADMIN'])}
-                            >
-                              {busyKey === `${c.candidateId}:FINAL:SELECT` ? <Spinner size={14} /> : null}
-                              Select
-                            </button>
-                            <button
-                              className="button"
-                              type="button"
-                              onClick={() => {
-                                if (!allowAction_('OWNER_FINAL_DECIDE', ['OWNER', 'ADMIN'])) {
-                                  toast.error('Not allowed');
-                                  return;
-                                }
-                                openFinalActions(c);
-                              }}
-                              disabled={!allowAction_('OWNER_FINAL_DECIDE', ['OWNER', 'ADMIN'])}
-                            >
-                              Hold / Reject
-                            </button>
+                                {/* Detailed candidate info */}
+                                <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 6, padding: '8px 12px', background: 'var(--gray-50)', borderRadius: 8 }}>
+                                  {c.phone && <div className="small">📞 <strong>Phone:</strong> {c.phone}</div>}
+                                  {c.email && <div className="small">✉️ <strong>Email:</strong> {c.email}</div>}
+                                  {c.experience && <div className="small">💼 <strong>Experience:</strong> {c.experience}</div>}
+                                  {c.currentSalary && <div className="small">💰 <strong>Current:</strong> {c.currentSalary}</div>}
+                                  {c.expectedSalary && <div className="small">💵 <strong>Expected:</strong> {c.expectedSalary}</div>}
+                                  {c.noticePeriod && <div className="small">⏱️ <strong>Notice:</strong> {c.noticePeriod}</div>}
+                                  {c.source && <div className="small">📌 <strong>Source:</strong> {c.source}</div>}
+                                  {c.location && <div className="small">📍 <strong>Location:</strong> {c.location}</div>}
+                                </div>
+
+                                <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                  <span className="badge">Req: {c.requirementId}</span>
+                                  <span className="badge" style={{ background: 'var(--primary)', color: '#fff' }}>
+                                    Final Decision
+                                  </span>
+                                </div>
+
+                                {/* Scores */}
+                                <div style={{ marginTop: 12, padding: '10px 12px', background: 'var(--gray-100)', borderRadius: 'var(--radius)' }}>
+                                  <div className="small" style={{ fontWeight: 600, marginBottom: 6 }}>Scores</div>
+                                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                    <span
+                                      className="badge"
+                                      style={{
+                                        background: String(c.onlineTestResult || '').toUpperCase() === 'PASS' ? '#22c55e' : String(c.onlineTestResult || '').toUpperCase() === 'FAIL' ? '#ef4444' : undefined,
+                                        color: String(c.onlineTestResult || '').toUpperCase() ? '#fff' : undefined,
+                                      }}
+                                    >
+                                      Online Test: {(c.onlineTestScore === '' || c.onlineTestScore == null) ? '-' : c.onlineTestScore}{c.onlineTestResult ? ` (${String(c.onlineTestResult).toUpperCase()})` : ''}
+                                    </span>
+                                    {String(c.onlineTestResult || '').toUpperCase() === 'FAIL' && isContinued_(c, 'ONLINE_TEST') ? (
+                                      <span className="badge" style={{ background: '#f59e0b', color: '#fff' }}>Continued by HR</span>
+                                    ) : null}
+                                    {c.preInterviewMarks && <span className="badge">Pre-interview: {c.preInterviewMarks}</span>}
+                                    {c.inPersonMarks && <span className="badge" style={{ background: '#22c55e', color: '#fff' }}>In-person: {c.inPersonMarks}/10</span>}
+                                  </div>
+
+                                  <div className="small" style={{ marginTop: 8, fontWeight: 600 }}>Required Tests</div>
+                                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+                                    {Array.isArray(reqTests) && reqTests.length ? (
+                                      reqTests.map((rt) => (
+                                        <span key={rt.testKey} className="badge" style={badgeForStatus_(rt.status)}>
+                                          {rt.label || rt.testKey}: {statusLabel_(rt.status)}
+                                          {rt.marksNumber != null ? ` (${rt.marksNumber}/10)` : ''}
+                                        </span>
+                                      ))
+                                    ) : (
+                                      <span className="badge">No required tests</span>
+                                    )}
+                                  </div>
+
+                                  {Array.isArray(reqTests) && reqTests.length ? (
+                                    <div className="small" style={{ marginTop: 6, display: 'grid', gap: 4 }}>
+                                      {reqTests.map((rt) => (
+                                        <div key={rt.testKey}>
+                                          <span style={{ fontWeight: 600 }}>{rt.label || rt.testKey}</span>
+                                          {rt.filledAt ? ` · Filled: ${rt.filledBy || '-'} (${fmtDateTime(rt.filledAt)})` : ''}
+                                          {rt.reviewedAt ? ` · Reviewed: ${rt.reviewedBy || '-'} (${fmtDateTime(rt.reviewedAt)})` : ''}
+                                          {rt.remarks ? ` · ${rt.remarks}` : ''}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="action-grid" style={{ minWidth: 180 }}>
+                              <button className="button" type="button" onClick={() => viewCv(c)}>
+                                📄 CV
+                              </button>
+                              <button
+                                className="button primary"
+                                type="button"
+                                onClick={() => finalSelect(c)}
+                                disabled={!!busyKey || !allowAction_('OWNER_FINAL_DECIDE', ['OWNER', 'ADMIN'])}
+                              >
+                                {busyKey === `${c.candidateId}:FINAL:SELECT` ? <Spinner size={14} /> : null}
+                                Select
+                              </button>
+                              <button
+                                className="button"
+                                type="button"
+                                onClick={() => {
+                                  if (!allowAction_('OWNER_FINAL_DECIDE', ['OWNER', 'ADMIN'])) {
+                                    toast.error('Not allowed');
+                                    return;
+                                  }
+                                  openFinalActions(c);
+                                }}
+                                disabled={!allowAction_('OWNER_FINAL_DECIDE', ['OWNER', 'ADMIN'])}
+                              >
+                                Hold / Reject
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </Collapsible>
           )}
@@ -683,6 +888,56 @@ export function OwnerPage() {
           </div>
         </div>
       )}
+
+      {/* CV Preview Modal */}
+      <CvPreviewModal
+        open={cvPreview.open}
+        onClose={() => setCvPreview({ open: false, candidate: null })}
+        cvFileId={cvPreview.candidate?.cvFileId}
+        token={token}
+        candidate={cvPreview.candidate}
+      />
+
+      {/* Bulk Progress Modal */}
+      <BulkProgressModal
+        open={bulkProgress.open}
+        title={bulkProgress.title}
+        current={bulkProgress.current}
+        total={bulkProgress.total}
+        errors={bulkProgress.errors}
+        onClose={() => setBulkProgress({ open: false, title: '', current: 0, total: 0, errors: [] })}
+      />
+
+      {/* Bulk Action Bars */}
+      <BulkActionBar
+        selectedCount={Object.keys(selectedApprove).length}
+        onClearSelection={() => setSelectedApprove({})}
+        loading={bulkProgress.open}
+        actions={[
+          {
+            label: 'Bulk Approve',
+            onClick: bulkApprove,
+            variant: 'primary',
+            icon: '✓',
+            disabled: !allowAction_('OWNER_DECIDE', ['OWNER', 'ADMIN']),
+          },
+        ]}
+      />
+
+      <BulkActionBar
+        selectedCount={Object.keys(selectedFinal).length}
+        onClearSelection={() => setSelectedFinal({})}
+        loading={bulkProgress.open}
+        actions={[
+          {
+            label: 'Bulk Select',
+            onClick: bulkFinalSelect,
+            variant: 'primary',
+            icon: '✓',
+            disabled: !allowAction_('OWNER_FINAL_DECIDE', ['OWNER', 'ADMIN']),
+          },
+        ]}
+      />
     </AppLayout>
   );
 }

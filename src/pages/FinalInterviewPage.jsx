@@ -7,6 +7,8 @@ import { LoadingOverlay, Spinner } from '../components/ui/Spinner';
 import { Collapsible } from '../components/ui/Collapsible';
 import { SlaCountdown } from '../components/ui/SlaCountdown';
 import { ViewCvButton } from '../components/ui/ViewCvButton';
+import { CvPreviewModal } from '../components/ui/CvPreviewModal';
+import { BulkActionBar, BulkProgressModal, SelectAllCheckbox } from '../components/ui/BulkActionBar';
 import { candidateDisplayName } from '../utils/pii';
 
 function fmtDateTime(value) {
@@ -57,6 +59,13 @@ export function FinalInterviewPage() {
   const [tab, setTab] = useState('PASSED');
   const [busyKey, setBusyKey] = useState('');
   const [testsByCandidate, setTestsByCandidate] = useState({});
+
+  // CV Preview state
+  const [cvPreview, setCvPreview] = useState({ open: false, candidate: null });
+
+  // Bulk selection states
+  const [selectedPassed, setSelectedPassed] = useState({});
+  const [bulkProgress, setBulkProgress] = useState({ open: false, title: '', current: 0, total: 0, errors: [] });
 
   async function loadCandidateTests_(list) {
     if (!portalAllowed) return;
@@ -129,6 +138,67 @@ export function FinalInterviewPage() {
     }
   }
 
+  // View CV in modal
+  function viewCv(candidate) {
+    if (!candidate?.cvFileId) {
+      toast.error('CV not available');
+      return;
+    }
+    setCvPreview({ open: true, candidate });
+  }
+
+  // Bulk selection helpers
+  function toggleSelectPassed(candidateId, checked) {
+    setSelectedPassed(prev => {
+      const next = { ...prev };
+      if (checked) next[candidateId] = true;
+      else delete next[candidateId];
+      return next;
+    });
+  }
+
+  function selectAllPassed(checked) {
+    if (checked) {
+      const all = {};
+      passed.forEach(c => { all[c.candidateId] = true; });
+      setSelectedPassed(all);
+    } else {
+      setSelectedPassed({});
+    }
+  }
+
+  // Bulk send to owner
+  async function bulkSendToOwner() {
+    const selectedIds = Object.keys(selectedPassed);
+    if (selectedIds.length === 0) {
+      toast.error('Select candidates first');
+      return;
+    }
+
+    setBulkProgress({ open: true, title: 'Sending to Owner...', current: 0, total: selectedIds.length, errors: [] });
+
+    let errors = [];
+    for (let i = 0; i < selectedIds.length; i++) {
+      const candidateId = selectedIds[i];
+      const candidate = passed.find(c => c.candidateId === candidateId);
+      if (!candidate) continue;
+
+      setBulkProgress(prev => ({ ...prev, current: i + 1 }));
+      
+      try {
+        await finalSendOwner(token, { requirementId: candidate.requirementId, candidateId });
+      } catch (e) {
+        errors.push({ id: candidateId, message: e?.message || 'Failed' });
+      }
+    }
+
+    setBulkProgress(prev => ({ ...prev, errors }));
+    toast.success(`Sent to Owner: ${selectedIds.length - errors.length}/${selectedIds.length}`);
+    setSelectedPassed({});
+    await load();
+    setTab('PENDING_OWNER');
+  }
+
   return (
     <AppLayout>
       {!portalAllowed ? (
@@ -190,60 +260,105 @@ export function FinalInterviewPage() {
                   <div className="empty-state-text">No candidates ready</div>
                 </div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
-                  {passed.map((it) => {
-                    const key = `${it.requirementId}:${it.candidateId}:SEND_OWNER`;
-                    const reqTests = testsByCandidate?.[it.candidateId]?.requiredTests ?? [];
-                    return (
-                      <div key={it.candidateId} className="card" style={{ background: '#fff', border: '1px solid var(--gray-200)' }}>
-                        <div className="row" style={{ justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-                          <div>
-                            <div style={{ fontWeight: 700, fontSize: '15px' }}>
-                              {candidateDisplayName(it) || it.candidateId}
-                              {candidateDisplayName(it) && it.candidateId ? (
-                                <span className="small" style={{ fontWeight: 400, marginLeft: 8, color: 'var(--gray-500)' }}>
-                                  ({it.candidateId})
-                                </span>
-                              ) : null}
-                            </div>
-                            <div className="small" style={{ color: 'var(--gray-500)', marginTop: 2 }}>
-                              {it.jobTitle ? `${it.jobTitle} · ` : ''}{it.jobRole || '-'}
-                            </div>
-                            <SlaCountdown sla={it.sla} />
-                            <div style={{ marginTop: 6, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                              <span className="badge" style={{ background: '#22c55e', color: '#fff' }}>
-                                In-person: {it.inPersonMarks}/10
-                              </span>
-                              {Array.isArray(reqTests) && reqTests.length ? (
-                                reqTests.map((rt) => (
-                                  <span key={rt.testKey} className="badge" style={badgeForStatus_(rt.status)}>
-                                    {rt.label || rt.testKey}: {statusLabel_(rt.status)}
-                                    {rt.marksNumber != null ? ` (${rt.marksNumber}/10)` : ''}
-                                  </span>
-                                ))
-                              ) : (
-                                <span className="badge">No required tests</span>
-                              )}
-                            </div>
-                          </div>
+                <>
+                  {/* Select All */}
+                  <div style={{ marginBottom: 12, padding: '8px 12px', background: 'var(--gray-50)', borderRadius: 8 }}>
+                    <SelectAllCheckbox
+                      checked={Object.keys(selectedPassed).length === passed.length}
+                      indeterminate={Object.keys(selectedPassed).length > 0 && Object.keys(selectedPassed).length < passed.length}
+                      onChange={selectAllPassed}
+                      label={`Select All (${passed.length})`}
+                    />
+                  </div>
 
-                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                            <ViewCvButton cvFileId={it.cvFileId} token={token} />
-                            <button
-                              className="button primary"
-                              type="button"
-                              onClick={() => onSendToOwner(it)}
-                              disabled={!!busyKey || !allowAction_('FINAL_SEND_OWNER', ['HR', 'ADMIN'])}
-                            >
-                              {busyKey === key ? <Spinner size={14} /> : null}
-                              Send to Owner
-                            </button>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
+                    {passed.map((it) => {
+                      const key = `${it.requirementId}:${it.candidateId}:SEND_OWNER`;
+                      const reqTests = testsByCandidate?.[it.candidateId]?.requiredTests ?? [];
+                      const isSelected = !!selectedPassed[it.candidateId];
+
+                      return (
+                        <div 
+                          key={it.candidateId} 
+                          className="card" 
+                          style={{ 
+                            background: isSelected ? 'rgba(59, 130, 246, 0.05)' : '#fff', 
+                            border: isSelected ? '2px solid var(--primary)' : '1px solid var(--gray-200)',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <div className="row" style={{ justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flex: 1 }}>
+                              {/* Checkbox */}
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) => toggleSelectPassed(it.candidateId, e.target.checked)}
+                                style={{ width: 18, height: 18, marginTop: 4, cursor: 'pointer' }}
+                              />
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 700, fontSize: '15px' }}>
+                                  {candidateDisplayName(it) || it.candidateId}
+                                  {candidateDisplayName(it) && it.candidateId ? (
+                                    <span className="small" style={{ fontWeight: 400, marginLeft: 8, color: 'var(--gray-500)' }}>
+                                      ({it.candidateId})
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <div className="small" style={{ color: 'var(--gray-500)', marginTop: 2 }}>
+                                  {it.jobTitle ? `${it.jobTitle} · ` : ''}{it.jobRole || '-'}
+                                </div>
+
+                                {/* Detailed candidate info */}
+                                <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 6, padding: '8px 12px', background: 'var(--gray-50)', borderRadius: 8 }}>
+                                  {it.phone && <div className="small">📞 <strong>Phone:</strong> {it.phone}</div>}
+                                  {it.email && <div className="small">✉️ <strong>Email:</strong> {it.email}</div>}
+                                  {it.experience && <div className="small">💼 <strong>Exp:</strong> {it.experience}</div>}
+                                  {it.currentSalary && <div className="small">💰 <strong>Current:</strong> {it.currentSalary}</div>}
+                                  {it.expectedSalary && <div className="small">💵 <strong>Expected:</strong> {it.expectedSalary}</div>}
+                                  {it.noticePeriod && <div className="small">⏱️ <strong>Notice:</strong> {it.noticePeriod}</div>}
+                                  {it.source && <div className="small">📌 <strong>Source:</strong> {it.source}</div>}
+                                </div>
+
+                                <SlaCountdown sla={it.sla} />
+                                <div style={{ marginTop: 6, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                  <span className="badge" style={{ background: '#22c55e', color: '#fff' }}>
+                                    In-person: {it.inPersonMarks}/10
+                                  </span>
+                                  {Array.isArray(reqTests) && reqTests.length ? (
+                                    reqTests.map((rt) => (
+                                      <span key={rt.testKey} className="badge" style={badgeForStatus_(rt.status)}>
+                                        {rt.label || rt.testKey}: {statusLabel_(rt.status)}
+                                        {rt.marksNumber != null ? ` (${rt.marksNumber}/10)` : ''}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="badge">No required tests</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                              <button className="button" type="button" onClick={() => viewCv(it)}>
+                                📄 View CV
+                              </button>
+                              <button
+                                className="button primary"
+                                type="button"
+                                onClick={() => onSendToOwner(it)}
+                                disabled={!!busyKey || !allowAction_('FINAL_SEND_OWNER', ['HR', 'ADMIN'])}
+                              >
+                                {busyKey === key ? <Spinner size={14} /> : null}
+                                Send to Owner
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </Collapsible>
           ) : (
@@ -276,9 +391,22 @@ export function FinalInterviewPage() {
                         <div className="small" style={{ color: 'var(--gray-500)', marginTop: 2 }}>
                           {it.jobTitle ? `${it.jobTitle} · ` : ''}{it.jobRole || '-'}
                         </div>
+
+                        {/* Detailed info */}
+                        <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 6, padding: '8px 12px', background: 'var(--gray-50)', borderRadius: 8 }}>
+                          {it.phone && <div className="small">📞 <strong>Phone:</strong> {it.phone}</div>}
+                          {it.email && <div className="small">✉️ <strong>Email:</strong> {it.email}</div>}
+                          {it.experience && <div className="small">💼 <strong>Exp:</strong> {it.experience}</div>}
+                          {it.currentSalary && <div className="small">💰 <strong>Current:</strong> {it.currentSalary}</div>}
+                          {it.expectedSalary && <div className="small">💵 <strong>Expected:</strong> {it.expectedSalary}</div>}
+                          {it.source && <div className="small">📌 <strong>Source:</strong> {it.source}</div>}
+                        </div>
+
                         <SlaCountdown sla={it.sla} />
                         <div style={{ marginTop: 10 }}>
-                          <ViewCvButton cvFileId={it.cvFileId} token={token} />
+                          <button className="button" type="button" onClick={() => viewCv(it)}>
+                            📄 View CV
+                          </button>
                         </div>
                         <div style={{ marginTop: 6, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                           <span className="badge" style={{ background: '#22c55e', color: '#fff' }}>
@@ -307,6 +435,41 @@ export function FinalInterviewPage() {
           )}
         </>
       )}
+
+      {/* CV Preview Modal */}
+      <CvPreviewModal
+        open={cvPreview.open}
+        onClose={() => setCvPreview({ open: false, candidate: null })}
+        cvFileId={cvPreview.candidate?.cvFileId}
+        token={token}
+        candidate={cvPreview.candidate}
+      />
+
+      {/* Bulk Progress Modal */}
+      <BulkProgressModal
+        open={bulkProgress.open}
+        title={bulkProgress.title}
+        current={bulkProgress.current}
+        total={bulkProgress.total}
+        errors={bulkProgress.errors}
+        onClose={() => setBulkProgress({ open: false, title: '', current: 0, total: 0, errors: [] })}
+      />
+
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        selectedCount={Object.keys(selectedPassed).length}
+        onClearSelection={() => setSelectedPassed({})}
+        loading={bulkProgress.open}
+        actions={[
+          {
+            label: 'Bulk Send to Owner',
+            onClick: bulkSendToOwner,
+            variant: 'primary',
+            icon: '📤',
+            disabled: !allowAction_('FINAL_SEND_OWNER', ['HR', 'ADMIN']),
+          },
+        ]}
+      />
     </AppLayout>
   );
 }

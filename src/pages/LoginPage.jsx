@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { GoogleOAuthButton } from '../auth/GoogleOAuthButton';
 import { useAuth } from '../auth/useAuth';
+import '../styles/login.css';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -44,80 +45,76 @@ export function LoginPage() {
   );
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '20px',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
-    }}>
-      <div className="card" style={{
-        width: '100%',
-        maxWidth: '420px',
-        padding: '40px',
-        textAlign: 'center',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-      }}>
-        <div style={{
-          width: '72px',
-          height: '72px',
-          background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-          borderRadius: '16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'white',
-          fontWeight: '800',
-          fontSize: '24px',
-          margin: '0 auto 24px',
-          boxShadow: '0 10px 15px -3px rgba(37, 99, 235, 0.3)'
-        }}>NT</div>
+    <div className="login-page">
+      {/* Animated background elements */}
+      <div className="login-bg">
+        <div className="login-bg-shape shape-1" />
+        <div className="login-bg-shape shape-2" />
+        <div className="login-bg-shape shape-3" />
+        <div className="login-bg-grid" />
+      </div>
 
-        <h1 style={{ margin: '0 0 8px', fontSize: '28px', fontWeight: '700', color: 'var(--gray-900)' }}>
-          Welcome Back
-        </h1>
-        <p style={{ margin: '0 0 32px', color: 'var(--gray-500)', fontSize: '15px' }}>
-          Sign in to NT Woods HRMS Portal
-        </p>
+      {/* 3D Login Card */}
+      <div className="login-card-wrapper">
+        <div className="login-card">
+          {/* Glowing logo */}
+          <div className="login-logo">
+            <div className="login-logo-inner">NT</div>
+            <div className="login-logo-glow" />
+          </div>
 
-        <GoogleOAuthButton onCredential={onCredential} />
+          <h1 className="login-title">Welcome Back</h1>
+          <p className="login-subtitle">Sign in to NT Woods HRMS Portal</p>
 
-        <div style={{
-          marginTop: '24px',
-          padding: '12px 16px',
-          background: 'var(--gray-50)',
-          borderRadius: 'var(--radius-sm)',
-          fontSize: '13px',
-          color: 'var(--gray-600)'
-        }}>
-          Use your NT Woods authorized Google account
+          <div className="login-divider">
+            <span>Continue with</span>
+          </div>
+
+          <GoogleOAuthButton onCredential={onCredential} />
+
+          <div className="login-hint">
+            Use your NT Woods authorized Google account
+          </div>
+
+          <div className="login-separator">
+            <span>OR</span>
+          </div>
+
+          <div className="login-employee-section">
+            <div className="login-employee-label">Employee Login</div>
+            <div className="login-employee-form">
+              <input
+                className="login-input"
+                placeholder="Enter Employee ID"
+                value={employeeId}
+                onChange={(e) => setEmployeeId(e.target.value)}
+                autoComplete="off"
+              />
+              <button 
+                className="login-btn primary" 
+                type="button" 
+                onClick={onEmployeeLogin} 
+                disabled={empLoading}
+              >
+                {empLoading ? (
+                  <span className="login-btn-loading">
+                    <span className="spinner" />
+                    Signing in...
+                  </span>
+                ) : (
+                  'Login with Employee ID'
+                )}
+              </button>
+            </div>
+          </div>
+
+          <p className="login-footer">
+            Access denied? <a href="mailto:admin@ntwoods.com">Contact Administrator</a>
+          </p>
         </div>
 
-        <div style={{ marginTop: 18 }}>
-          <div className="small" style={{ marginBottom: 8, color: 'var(--gray-600)' }}>
-            Employee login (no password)
-          </div>
-          <div style={{ display: 'grid', gap: 8 }}>
-            <input
-              placeholder="Employee ID"
-              value={employeeId}
-              onChange={(e) => setEmployeeId(e.target.value)}
-              autoComplete="off"
-            />
-            <button className="button primary" type="button" onClick={onEmployeeLogin} disabled={empLoading}>
-              {empLoading ? 'Signing in…' : 'Login with Employee ID'}
-            </button>
-          </div>
-        </div>
-
-        <p style={{
-          marginTop: '20px',
-          fontSize: '12px',
-          color: 'var(--gray-400)'
-        }}>
-          Access denied? Contact your Administrator
-        </p>
+        {/* 3D shadow effect */}
+        <div className="login-card-shadow" />
       </div>
     </div>
   );

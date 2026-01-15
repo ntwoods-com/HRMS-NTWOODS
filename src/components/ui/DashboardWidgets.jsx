@@ -282,7 +282,7 @@ function WidgetRenderer({ config, data, loading, onClick }) {
  * Role-based Dashboard Widgets Component
  */
 export function DashboardWidgets({ customData = {}, onWidgetClick }) {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [widgetData, setWidgetData] = useState({});
   const [loading, setLoading] = useState(true);
 
@@ -290,66 +290,53 @@ export function DashboardWidgets({ customData = {}, onWidgetClick }) {
   const userRole = user?.role?.toLowerCase() || 'default';
   const widgets = WIDGET_CONFIGS[userRole] || WIDGET_CONFIGS.default;
 
-  // Simulate data loading (replace with real API calls)
+  // Load real data from API or show placeholder when no data
   useEffect(() => {
     const loadWidgetData = async () => {
       setLoading(true);
       
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // Small delay for smooth UX
+      await new Promise(resolve => setTimeout(resolve, 300));
       
-      // Generate mock data based on widget configs
-      const mockData = {};
+      // Initialize with zeros/empty - real data should come from customData prop
+      const initialData = {};
       widgets.forEach(widget => {
         switch (widget.type) {
           case 'stat':
-            mockData[widget.id] = { value: Math.floor(Math.random() * 100) };
+            initialData[widget.id] = { value: 0 };
             break;
           case 'list':
-            mockData[widget.id] = {
-              items: [
-                { title: 'Interview with John Doe', meta: 'Today, 2:00 PM' },
-                { title: 'Review candidate profile', meta: '30 mins ago' },
-                { title: 'Team meeting scheduled', meta: 'Tomorrow' },
-              ]
-            };
+            initialData[widget.id] = { items: [] };
             break;
           case 'health':
-            mockData[widget.id] = {
-              health: 95,
-              uptime: '99.9%',
-              apiStatus: 'OK',
-              dbStatus: 'OK',
+            initialData[widget.id] = {
+              health: 100,
+              uptime: '—',
+              apiStatus: '—',
+              dbStatus: '—',
             };
             break;
           case 'alerts':
-            mockData[widget.id] = { alerts: [] };
+            initialData[widget.id] = { alerts: [] };
             break;
           case 'sla':
-            mockData[widget.id] = {
-              stages: [
-                { name: 'Screening', compliance: 92 },
-                { name: 'Technical', compliance: 85 },
-                { name: 'Final', compliance: 78 },
-              ]
-            };
+            initialData[widget.id] = { stages: [] };
             break;
           case 'chart':
-            mockData[widget.id] = {
-              values: [3, 5, 2, 7, 4, 6, 8]
-            };
+            initialData[widget.id] = { values: [] };
             break;
           default:
-            mockData[widget.id] = { value: 0 };
+            initialData[widget.id] = { value: 0 };
         }
       });
       
-      setWidgetData({ ...mockData, ...customData });
+      // Merge with any custom/real data passed from parent
+      setWidgetData({ ...initialData, ...customData });
       setLoading(false);
     };
 
     loadWidgetData();
-  }, [userRole, customData]);
+  }, [userRole, customData, widgets]);
 
   return (
     <div className="dashboard-widgets-grid">

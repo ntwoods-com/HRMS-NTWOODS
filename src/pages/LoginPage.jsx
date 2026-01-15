@@ -111,6 +111,8 @@ export function LoginPage() {
           <p className="login-footer">
             Access denied? <a href="mailto:admin@ntwoods.com">Contact Administrator</a>
           </p>
+
+          <p className="login-credit">Designed & Developed by Rajesh Jadoun</p>
         </div>
 
         {/* 3D shadow effect */}

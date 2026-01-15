@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { NavLink } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../utils/cn';
 import { useAuth } from '../../auth/useAuth';
 import { Badge } from '../ui/Badge';
@@ -23,8 +23,16 @@ function allowPortal_(canPortal, portalKey, fallbackAllowed) {
   return fallbackAllowed;
 }
 
+function isActivePath_(pathname, to) {
+  if (!to) return false;
+  if (to === '/') return pathname === '/';
+  return pathname === to || pathname.startsWith(`${to}/`);
+}
+
 export function Sidebar({ collapsed, onToggleCollapsed }) {
   const { me, role, legacyRole, permissions, canPortal } = useAuth();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
 
   const effectiveRole = legacyRole || role;
   const sections = useMemo(() => getNavSections(), []);
@@ -162,23 +170,28 @@ export function Sidebar({ collapsed, onToggleCollapsed }) {
           <div key={s.key} className="sidebar-section">
             {!collapsed ? <div className="sidebar-sectionTitle">{s.title}</div> : null}
             <div className="sidebar-links">
-              {s.items.map((it) => (
-                <NavLink
-                  key={it.key}
-                  to={it.to}
-                  className={({ isActive }) => cn('sidebar-link', isActive && 'is-active')}
-                  onMouseEnter={() => prefetch_(it)}
-                  onFocus={() => prefetch_(it)}
-                  onPointerDown={() => prefetch_(it)}
-                  aria-label={it.label}
-                  data-tooltip={it.label}
-                >
-                  <span className="sidebar-linkIcon" aria-hidden="true">
-                    {'\u2022'}
-                  </span>
-                  {!collapsed ? <span className="sidebar-linkLabel">{it.label}</span> : null}
-                </NavLink>
-              ))}
+              {s.items.map((it) => {
+                const isActive = isActivePath_(pathname, it.to);
+                return (
+                  <button
+                    key={it.key}
+                    type="button"
+                    className={cn('sidebar-link', isActive && 'is-active')}
+                    onMouseEnter={() => prefetch_(it)}
+                    onFocus={() => prefetch_(it)}
+                    onPointerDown={() => prefetch_(it)}
+                    aria-label={it.label}
+                    aria-current={isActive ? 'page' : undefined}
+                    title={collapsed ? it.label : undefined}
+                    onClick={() => navigate(it.to)}
+                  >
+                    <span className="sidebar-linkIcon" aria-hidden="true">
+                      {'\u2022'}
+                    </span>
+                    {!collapsed ? <span className="sidebar-linkLabel">{it.label}</span> : null}
+                  </button>
+                );
+              })}
             </div>
           </div>
         ))}

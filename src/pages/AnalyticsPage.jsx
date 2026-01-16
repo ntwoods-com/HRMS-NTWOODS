@@ -61,6 +61,10 @@ const DEMO_SLA_DATA = [
 ];
 
 const STAGE_COLOR = {
+  SHORTLISTING: 'blue',
+  OWNER_APPROVAL: 'purple',
+  WALKIN: 'orange',
+  FINAL_DECISION: 'green',
   HR_REVIEW: 'blue',
   PRECALL: 'orange',
   PRE_INTERVIEW: 'orange',
@@ -71,6 +75,8 @@ const STAGE_COLOR = {
   JOINING: 'blue',
   PROBATION: 'blue',
   HIRED: 'green',
+  REJECTED: 'red',
+  OTHER: 'gray',
 };
 
 function toChartDataFromPipeline_(stages = []) {
@@ -290,4 +296,3 @@ export function AnalyticsPage() {
 }
 
 export default AnalyticsPage;
-

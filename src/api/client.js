@@ -1,4 +1,5 @@
 import { API_ENDPOINT } from '../config';
+import { pushNotification } from '../notifications/notificationsBus';
 
 export class ApiError extends Error {
   constructor(code, message) {
@@ -9,6 +10,19 @@ export class ApiError extends Error {
 }
 
 const inflight_ = new Map();
+
+function notifyTransportError_(code, message) {
+  // Only notify for transport/config issues to avoid duplicating page-level toasts.
+  const c = String(code || '').toUpperCase().trim();
+  if (!['NETWORK_ERROR', 'BAD_RESPONSE', 'CONFIG_MISSING'].includes(c)) return;
+
+  pushNotification({
+    id: `api_${c}`,
+    type: 'error',
+    title: c === 'NETWORK_ERROR' ? 'Network error' : c === 'BAD_RESPONSE' ? 'Bad response' : 'Configuration error',
+    message: String(message || ''),
+  });
+}
 
 function normalizeRbacMessage_(code, message) {
   if (code !== 'RBAC_DENIED') return message;
@@ -33,6 +47,7 @@ function inflightKey_(action, token, data) {
 
 async function apiPostImpl_(action, data, token, { signal } = {}) {
   if (!API_ENDPOINT) {
+    notifyTransportError_('CONFIG_MISSING', 'Missing VITE_API_ENDPOINT');
     throw new ApiError('CONFIG_MISSING', 'Missing VITE_API_ENDPOINT');
   }
 
@@ -54,6 +69,7 @@ async function apiPostImpl_(action, data, token, { signal } = {}) {
       signal,
     });
   } catch {
+    notifyTransportError_('NETWORK_ERROR', 'Network error calling backend');
     throw new ApiError('NETWORK_ERROR', 'Network error calling backend');
   }
 
@@ -61,10 +77,12 @@ async function apiPostImpl_(action, data, token, { signal } = {}) {
   try {
     json = await res.json();
   } catch {
+    notifyTransportError_('BAD_RESPONSE', 'Backend returned non-JSON response');
     throw new ApiError('BAD_RESPONSE', 'Backend returned non-JSON response');
   }
 
   if (!json || typeof json.ok !== 'boolean') {
+    notifyTransportError_('BAD_RESPONSE', 'Backend response missing ok flag');
     throw new ApiError('BAD_RESPONSE', 'Backend response missing ok flag');
   }
 
@@ -97,3 +115,4 @@ export async function apiPost(action, data, token, { signal } = {}) {
     if (key) inflight_.delete(key);
   }
 }
+

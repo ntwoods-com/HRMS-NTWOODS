@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useNotifications, NotificationType } from '../../hooks/useNotifications';
+import React, { useEffect, useRef, useState } from 'react';
+import { useNotifications, NotificationType, DEMO_NOTIFICATIONS } from '../../hooks/useNotifications';
 import { cn } from '../../utils/cn';
 import {
   BellIcon,
@@ -75,6 +75,7 @@ export function NotificationBell() {
     notifications,
     unreadCount,
     soundEnabled,
+    addNotification,
     markAsRead,
     markAllAsRead,
     removeNotification,
@@ -83,7 +84,6 @@ export function NotificationBell() {
     playTestSound,
   } = useNotifications();
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -112,9 +112,7 @@ export function NotificationBell() {
       >
         <BellIcon size={20} />
         {unreadCount > 0 && (
-          <span className="notification-bell-badge">
-            {unreadCount > 9 ? '9+' : unreadCount}
-          </span>
+          <span className="notification-bell-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
         )}
       </button>
 
@@ -133,6 +131,7 @@ export function NotificationBell() {
               >
                 {soundEnabled ? <Volume2Icon size={14} /> : <VolumeXIcon size={14} />}
               </button>
+
               {notifications.length > 0 && (
                 <>
                   <button onClick={markAllAsRead} className="notification-action-btn">
@@ -149,33 +148,34 @@ export function NotificationBell() {
           <div className="notification-list">
             {notifications.length === 0 ? (
               <div className="notification-empty">
-                <span className="notification-empty-icon">🔔</span>
+                <span className="notification-empty-icon" aria-hidden="true">
+                  <BellIcon size={28} />
+                </span>
                 <p>No notifications yet</p>
+                <button
+                  type="button"
+                  className="notification-view-all"
+                  onClick={() => {
+                    for (const n of DEMO_NOTIFICATIONS) addNotification(n);
+                  }}
+                >
+                  Add demo notifications
+                </button>
               </div>
             ) : (
               notifications.slice(0, 10).map((notification) => (
                 <div
                   key={notification.id}
-                  className={cn(
-                    'notification-item',
-                    !notification.read && 'unread'
-                  )}
+                  className={cn('notification-item', !notification.read && 'unread')}
                   onClick={() => handleNotificationClick(notification)}
                 >
-                  <div
-                    className={cn(
-                      'notification-icon',
-                      getTypeColor(notification.type)
-                    )}
-                  >
+                  <div className={cn('notification-icon', getTypeColor(notification.type))}>
                     {getTypeIcon(notification.type)}
                   </div>
                   <div className="notification-content">
                     <div className="notification-title">{notification.title}</div>
                     <div className="notification-message">{notification.message}</div>
-                    <div className="notification-time">
-                      {formatTimeAgo(notification.createdAt)}
-                    </div>
+                    <div className="notification-time">{formatTimeAgo(notification.createdAt)}</div>
                   </div>
                   <button
                     className="notification-close"
@@ -194,9 +194,7 @@ export function NotificationBell() {
 
           {notifications.length > 10 && (
             <div className="notification-dropdown-footer">
-              <button className="notification-view-all">
-                View all ({notifications.length})
-              </button>
+              <button className="notification-view-all">View all ({notifications.length})</button>
             </div>
           )}
         </div>
@@ -204,3 +202,4 @@ export function NotificationBell() {
     </div>
   );
 }
+

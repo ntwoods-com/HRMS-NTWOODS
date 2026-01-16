@@ -1,12 +1,21 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
 import { AppLayout } from '../components/layout/AppLayout';
-import { BarChart, LineChart, DonutChart, StatCard, ProgressBar } from '../components/ui/AnalyticsChart';
-import { ActivityTimeline, ActivityWidget } from '../components/ui/ActivityTimeline';
+import { BarChart, DonutChart, LineChart, ProgressBar, StatCard } from '../components/ui/AnalyticsChart';
+import { ActivityTimeline } from '../components/ui/ActivityTimeline';
 import { Spinner } from '../components/ui/Spinner';
+import { AwardIcon, ClockIcon, FileTextIcon, UsersIcon } from '../components/ui/Icons';
 import { useAuth } from '../auth/useAuth';
-import { candidatePipelineStats, recentActivity } from '../api/analytics';
+import {
+  candidatePipelineStats,
+  dashboardMetrics,
+  hiringTrends,
+  recentActivity,
+  slaCompliance,
+  sourceDistribution,
+} from '../api/analytics';
 
-// Demo data for development (replace with API calls)
+// Demo data for development (used as a fallback when APIs fail)
 const DEMO_PIPELINE_DATA = [
   { label: 'HR Review', value: 45, color: 'blue' },
   { label: 'Precall', value: 32, color: 'orange' },
@@ -41,38 +50,6 @@ const DEMO_ACTIVITIES = [
     timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     metadata: { actor: 'HR Admin' },
   },
-  {
-    id: '2',
-    type: 'STATUS_CHANGE',
-    title: 'Status updated',
-    description: 'Interview scheduled for Priya Patel',
-    timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-    metadata: { from: 'Precall', to: 'Tech Interview', actor: 'HR Manager' },
-  },
-  {
-    id: '3',
-    type: 'APPROVAL',
-    title: 'Approval granted',
-    description: 'Final approval for Amit Kumar',
-    timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-    metadata: { actor: 'Owner' },
-  },
-  {
-    id: '4',
-    type: 'CREATE',
-    title: 'New requirement',
-    description: 'Senior React Developer position created',
-    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    metadata: { actor: 'EA Team' },
-  },
-  {
-    id: '5',
-    type: 'REJECTION',
-    title: 'Candidate rejected',
-    description: 'Did not meet technical requirements',
-    timestamp: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-    metadata: { actor: 'Tech Lead' },
-  },
 ];
 
 const DEMO_SLA_DATA = [
@@ -83,8 +60,53 @@ const DEMO_SLA_DATA = [
   { label: 'Joining', value: 88, max: 100 },
 ];
 
+const STAGE_COLOR = {
+  HR_REVIEW: 'blue',
+  PRECALL: 'orange',
+  PRE_INTERVIEW: 'orange',
+  INPERSON_TECH: 'purple',
+  EA_TECH: 'purple',
+  FINAL_INTERVIEW: 'green',
+  FINAL_HOLD: 'orange',
+  JOINING: 'blue',
+  PROBATION: 'blue',
+  HIRED: 'green',
+};
+
+function toChartDataFromPipeline_(stages = []) {
+  if (!Array.isArray(stages)) return [];
+  return stages.map((s) => ({
+    label: String(s.label || s.stage || ''),
+    value: Number(s.count || 0),
+    color: STAGE_COLOR[String(s.stage || '').toUpperCase()] || 'gray',
+  }));
+}
+
+function toChartDataFromSources_(sources = []) {
+  if (!Array.isArray(sources)) return [];
+  return sources.map((s) => ({
+    label: String(s.label || s.source || 'Other'),
+    value: Number(s.count || 0),
+    color: String(s.color || 'gray'),
+  }));
+}
+
+function toChartDataFromTrends_(trends = []) {
+  if (!Array.isArray(trends)) return [];
+  return trends.map((t) => ({ label: String(t.period || ''), value: Number(t.count || 0) }));
+}
+
+function toSlaBars_(metrics = []) {
+  if (!Array.isArray(metrics)) return [];
+  return metrics.map((m) => ({
+    label: String(m.label || m.stage || ''),
+    value: Number(m.compliance || 0),
+    max: 100,
+  }));
+}
+
 export function AnalyticsPage() {
-  const { token, role } = useAuth();
+  const { token } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState({
     totalCandidates: 0,
@@ -98,37 +120,76 @@ export function AnalyticsPage() {
   const [activities, setActivities] = useState(DEMO_ACTIVITIES);
   const [slaData, setSlaData] = useState(DEMO_SLA_DATA);
 
+  const statCards = useMemo(
+    () => [
+      {
+        title: 'Total Candidates',
+        value: stats.totalCandidates,
+        change: undefined,
+        changeType: 'neutral',
+        icon: <UsersIcon size={18} />,
+      },
+      {
+        title: 'Active Requirements',
+        value: stats.activeRequirements,
+        change: undefined,
+        changeType: 'neutral',
+        icon: <FileTextIcon size={18} />,
+      },
+      {
+        title: 'Pending Approvals',
+        value: stats.pendingApprovals,
+        change: undefined,
+        changeType: 'neutral',
+        icon: <ClockIcon size={18} />,
+      },
+      {
+        title: 'This Month Hires',
+        value: stats.thisMonthHires,
+        change: undefined,
+        changeType: 'neutral',
+        icon: <AwardIcon size={18} />,
+      },
+    ],
+    [stats]
+  );
+
   useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+
     async function loadData() {
       setIsLoading(true);
       try {
-        // Replace with actual API calls
-        // const pipelineStats = await candidatePipelineStats(token);
-        // const activityData = await recentActivity(token);
-        
-        // Simulating API delay
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        
-        setStats({
-          totalCandidates: 156,
-          activeRequirements: 12,
-          pendingApprovals: 8,
-          thisMonthHires: 5,
-        });
-        
-        setPipelineData(DEMO_PIPELINE_DATA);
-        setTrendData(DEMO_TREND_DATA);
-        setSourceData(DEMO_SOURCE_DATA);
-        setActivities(DEMO_ACTIVITIES);
-        setSlaData(DEMO_SLA_DATA);
+        const [metricsRes, pipelineRes, sourcesRes, trendsRes, slaRes, activityRes] = await Promise.all([
+          dashboardMetrics(token),
+          candidatePipelineStats(token),
+          sourceDistribution(token),
+          hiringTrends(token, { period: 'monthly' }),
+          slaCompliance(token),
+          recentActivity(token, { limit: 25 }),
+        ]);
+
+        if (cancelled) return;
+
+        if (metricsRes) setStats(metricsRes);
+        if (pipelineRes?.stages) setPipelineData(toChartDataFromPipeline_(pipelineRes.stages));
+        if (sourcesRes?.sources) setSourceData(toChartDataFromSources_(sourcesRes.sources));
+        if (trendsRes?.trends) setTrendData(toChartDataFromTrends_(trendsRes.trends));
+        if (slaRes?.metrics) setSlaData(toSlaBars_(slaRes.metrics));
+        if (activityRes?.activities) setActivities(activityRes.activities);
       } catch (error) {
         console.error('Failed to load analytics:', error);
+        toast.error('Failed to load analytics', { id: 'analytics_load' });
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     }
 
     loadData();
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   if (isLoading) {
@@ -136,7 +197,9 @@ export function AnalyticsPage() {
       <AppLayout>
         <div className="card" style={{ textAlign: 'center', padding: '60px' }}>
           <Spinner />
-          <p className="small" style={{ marginTop: '16px' }}>Loading analytics...</p>
+          <p className="small" style={{ marginTop: '16px' }}>
+            Loading analytics...
+          </p>
         </div>
       </AppLayout>
     );
@@ -152,39 +215,19 @@ export function AnalyticsPage() {
           <p className="small">Real-time insights into your hiring pipeline</p>
         </div>
 
-        {/* Stats Cards */}
         <div className="metric-grid" style={{ marginBottom: '24px' }}>
-          <StatCard
-            title="Total Candidates"
-            value={stats.totalCandidates}
-            change="+12% from last month"
-            changeType="positive"
-            icon="👥"
-          />
-          <StatCard
-            title="Active Requirements"
-            value={stats.activeRequirements}
-            change="+3 this week"
-            changeType="positive"
-            icon="📋"
-          />
-          <StatCard
-            title="Pending Approvals"
-            value={stats.pendingApprovals}
-            change="Needs attention"
-            changeType="neutral"
-            icon="⏳"
-          />
-          <StatCard
-            title="This Month Hires"
-            value={stats.thisMonthHires}
-            change="+2 from last month"
-            changeType="positive"
-            icon="🎉"
-          />
+          {statCards.map((c) => (
+            <StatCard
+              key={c.title}
+              title={c.title}
+              value={c.value}
+              change={c.change}
+              changeType={c.changeType}
+              icon={c.icon}
+            />
+          ))}
         </div>
 
-        {/* Main Charts Row */}
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px', marginBottom: '24px' }}>
           <div className="card">
             <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px', color: 'var(--gray-900)' }}>
@@ -201,7 +244,6 @@ export function AnalyticsPage() {
           </div>
         </div>
 
-        {/* Second Charts Row */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
           <div className="card">
             <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px', color: 'var(--gray-900)' }}>
@@ -217,7 +259,7 @@ export function AnalyticsPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {slaData.map((item, index) => (
                 <ProgressBar
-                  key={index}
+                  key={`${item.label}-${index}`}
                   label={item.label}
                   value={item.value}
                   max={item.max}
@@ -228,13 +270,8 @@ export function AnalyticsPage() {
           </div>
         </div>
 
-        {/* Activity Timeline */}
         <div className="card">
-          <ActivityTimeline
-            activities={activities}
-            title="Recent Activity"
-            maxItems={5}
-          />
+          <ActivityTimeline activities={activities} title="Recent Activity" maxItems={8} />
         </div>
       </div>
 
@@ -253,3 +290,4 @@ export function AnalyticsPage() {
 }
 
 export default AnalyticsPage;
+

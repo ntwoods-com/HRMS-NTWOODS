@@ -27,16 +27,59 @@ const ShellContent = memo(function ShellContent({ children }) {
 
 export function AppShell({ children }) {
   const [collapsed, setCollapsed] = useState(loadCollapsed_);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     saveCollapsed_(collapsed);
   }, [collapsed]);
 
+  useEffect(() => {
+    const mql = window.matchMedia?.('(max-width: 920px)');
+    if (!mql) return;
+
+    const update = () => setIsMobile(!!mql.matches);
+    update();
+
+    if (typeof mql.addEventListener === 'function') {
+      mql.addEventListener('change', update);
+      return () => mql.removeEventListener('change', update);
+    }
+
+    // Safari < 14 fallback
+    mql.addListener?.(update);
+    return () => mql.removeListener?.(update);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) setMobileNavOpen(false);
+  }, [isMobile]);
+
+  const sidebarCollapsed = isMobile ? false : collapsed;
+
   return (
-    <div className={cn('app-shell', collapsed && 'is-collapsed')}>
-      <Sidebar collapsed={collapsed} onToggleCollapsed={() => setCollapsed((s) => !s)} />
+    <div className={cn('app-shell', sidebarCollapsed && 'is-collapsed', mobileNavOpen && 'is-mobile-nav-open')}>
+      <div
+        className="mobile-nav-overlay"
+        aria-hidden={!mobileNavOpen}
+        onClick={() => setMobileNavOpen(false)}
+      />
+
+      <Sidebar
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={() => {
+          if (isMobile) setMobileNavOpen(false);
+          else setCollapsed((s) => !s);
+        }}
+        onNavigate={() => setMobileNavOpen(false)}
+      />
       <div className="app-main">
-        <Topbar onToggleCollapsed={() => setCollapsed((s) => !s)} />
+        <Topbar
+          onToggleCollapsed={() => {
+            if (isMobile) setMobileNavOpen((s) => !s);
+            else setCollapsed((s) => !s);
+          }}
+        />
         <main className="app-content">
           <div className="container">
             <ShellContent>{children}</ShellContent>

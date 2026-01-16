@@ -282,12 +282,12 @@ function WidgetRenderer({ config, data, loading, onClick }) {
  * Role-based Dashboard Widgets Component
  */
 export function DashboardWidgets({ customData = {}, onWidgetClick }) {
-  const { user, token } = useAuth();
+  const { me, role } = useAuth();
   const [widgetData, setWidgetData] = useState({});
   const [loading, setLoading] = useState(true);
 
   // Determine which widgets to show based on role
-  const userRole = user?.role?.toLowerCase() || 'default';
+  const userRole = String(role || me?.role || '').toLowerCase() || 'default';
   const widgets = WIDGET_CONFIGS[userRole] || WIDGET_CONFIGS.default;
 
   // Load real data from API or show placeholder when no data

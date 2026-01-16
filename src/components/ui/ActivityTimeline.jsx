@@ -1,19 +1,31 @@
 import React from 'react';
 import { cn } from '../../utils/cn';
+import {
+  ActivityIcon,
+  ArrowRightIcon,
+  AwardIcon,
+  CalendarIcon,
+  CheckCircleIcon,
+  EditIcon,
+  MailIcon,
+  PlusIcon,
+  TrashIcon,
+  XCircleIcon,
+} from './Icons';
 
 /**
  * Activity types with their colors and icons
  */
 const ACTIVITY_TYPES = {
-  CREATE: { color: 'green', icon: '+', label: 'Created' },
-  UPDATE: { color: 'blue', icon: '✎', label: 'Updated' },
-  DELETE: { color: 'red', icon: '×', label: 'Deleted' },
-  STATUS_CHANGE: { color: 'orange', icon: '→', label: 'Status Changed' },
-  COMMENT: { color: 'purple', icon: '💬', label: 'Commented' },
-  APPROVAL: { color: 'green', icon: '✓', label: 'Approved' },
-  REJECTION: { color: 'red', icon: '✕', label: 'Rejected' },
-  INTERVIEW: { color: 'blue', icon: '📅', label: 'Interview' },
-  HIRE: { color: 'green', icon: '🎉', label: 'Hired' },
+  CREATE: { color: 'green', icon: PlusIcon, label: 'Created' },
+  UPDATE: { color: 'blue', icon: EditIcon, label: 'Updated' },
+  DELETE: { color: 'red', icon: TrashIcon, label: 'Deleted' },
+  STATUS_CHANGE: { color: 'orange', icon: ArrowRightIcon, label: 'Status Changed' },
+  COMMENT: { color: 'purple', icon: MailIcon, label: 'Commented' },
+  APPROVAL: { color: 'green', icon: CheckCircleIcon, label: 'Approved' },
+  REJECTION: { color: 'red', icon: XCircleIcon, label: 'Rejected' },
+  INTERVIEW: { color: 'blue', icon: CalendarIcon, label: 'Interview' },
+  HIRE: { color: 'green', icon: AwardIcon, label: 'Hired' },
 };
 
 function formatDate(dateString) {
@@ -38,12 +50,13 @@ function formatDate(dateString) {
 
 function ActivityItem({ activity, isLast }) {
   const typeConfig = ACTIVITY_TYPES[activity.type] || ACTIVITY_TYPES.UPDATE;
+  const MarkerIcon = typeConfig.icon || ActivityIcon;
 
   return (
     <div className={cn('timeline-item', isLast && 'is-last')}>
       <div className="timeline-marker-container">
         <div className={cn('timeline-marker', typeConfig.color)}>
-          <span>{typeConfig.icon}</span>
+          <MarkerIcon size={14} />
         </div>
         {!isLast && <div className="timeline-line" />}
       </div>
@@ -54,33 +67,27 @@ function ActivityItem({ activity, isLast }) {
           <span className="timeline-time">{formatDate(activity.timestamp)}</span>
         </div>
 
-        {activity.description && (
-          <p className="timeline-description">{activity.description}</p>
-        )}
+        {activity.description && <p className="timeline-description">{activity.description}</p>}
 
         {activity.metadata && (
           <div className="timeline-metadata">
             {activity.metadata.from && activity.metadata.to && (
               <div className="timeline-change">
                 <span className="timeline-change-from">{activity.metadata.from}</span>
-                <span className="timeline-change-arrow">→</span>
+                <span className="timeline-change-arrow" aria-hidden="true">
+                  <ArrowRightIcon size={14} />
+                </span>
                 <span className="timeline-change-to">{activity.metadata.to}</span>
               </div>
             )}
-            {activity.metadata.actor && (
-              <span className="timeline-actor">by {activity.metadata.actor}</span>
-            )}
+            {activity.metadata.actor && <span className="timeline-actor">by {activity.metadata.actor}</span>}
           </div>
         )}
 
         {activity.actions && (
           <div className="timeline-actions">
             {activity.actions.map((action, idx) => (
-              <button
-                key={idx}
-                className="timeline-action-btn"
-                onClick={action.onClick}
-              >
+              <button key={idx} className="timeline-action-btn" onClick={action.onClick}>
                 {action.label}
               </button>
             ))}
@@ -91,7 +98,12 @@ function ActivityItem({ activity, isLast }) {
   );
 }
 
-export function ActivityTimeline({ activities = [], maxItems, title = 'Recent Activity', emptyMessage = 'No activity yet' }) {
+export function ActivityTimeline({
+  activities = [],
+  maxItems,
+  title = 'Recent Activity',
+  emptyMessage = 'No activity yet',
+}) {
   const displayActivities = maxItems ? activities.slice(0, maxItems) : activities;
 
   return (
@@ -100,7 +112,9 @@ export function ActivityTimeline({ activities = [], maxItems, title = 'Recent Ac
 
       {displayActivities.length === 0 ? (
         <div className="timeline-empty">
-          <span className="timeline-empty-icon">📋</span>
+          <span className="timeline-empty-icon" aria-hidden="true">
+            <ActivityIcon size={24} />
+          </span>
           <p>{emptyMessage}</p>
         </div>
       ) : (
@@ -117,9 +131,7 @@ export function ActivityTimeline({ activities = [], maxItems, title = 'Recent Ac
 
       {maxItems && activities.length > maxItems && (
         <div className="timeline-footer">
-          <button className="timeline-view-all">
-            View all activity ({activities.length})
-          </button>
+          <button className="timeline-view-all">View all activity ({activities.length})</button>
         </div>
       )}
     </div>
@@ -155,12 +167,8 @@ export function ActivityWidget({ activities = [], maxItems = 5, onViewAll }) {
               <div key={activity.id || index} className="activity-widget-item">
                 <div className={cn('activity-widget-dot', typeConfig.color)} />
                 <div className="activity-widget-content">
-                  <span className="activity-widget-text">
-                    {activity.title || typeConfig.label}
-                  </span>
-                  <span className="activity-widget-time">
-                    {formatDate(activity.timestamp)}
-                  </span>
+                  <span className="activity-widget-text">{activity.title || typeConfig.label}</span>
+                  <span className="activity-widget-time">{formatDate(activity.timestamp)}</span>
                 </div>
               </div>
             );
@@ -170,3 +178,4 @@ export function ActivityWidget({ activities = [], maxItems = 5, onViewAll }) {
     </div>
   );
 }
+

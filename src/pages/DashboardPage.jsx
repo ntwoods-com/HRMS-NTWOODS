@@ -406,7 +406,40 @@ export function DashboardPage() {
   const renderActionPage = (title, desc, icon, iconColor, path, btnText) => (
     <div className="card" style={{ maxWidth: '500px' }}>
       <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
-        <div className={`icon ${iconColor}`} style={{ width: '48px', height: '48px', borderRadius: '12px', fontSize: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{icon}</div>
+        <div
+          className="action-icon"
+          style={{
+            width: '48px',
+            height: '48px',
+            borderRadius: '12px',
+            fontSize: '22px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background:
+              iconColor === 'blue'
+                ? '#dbeafe'
+                : iconColor === 'green'
+                  ? '#d1fae5'
+                  : iconColor === 'orange'
+                    ? '#fef3c7'
+                    : iconColor === 'red'
+                      ? '#fee2e2'
+                      : 'var(--gray-100)',
+            color:
+              iconColor === 'blue'
+                ? 'var(--primary)'
+                : iconColor === 'green'
+                  ? 'var(--success)'
+                  : iconColor === 'orange'
+                    ? 'var(--warning)'
+                    : iconColor === 'red'
+                      ? 'var(--danger)'
+                      : 'var(--gray-600)',
+          }}
+        >
+          {icon}
+        </div>
         <div style={{ flex: 1 }}>
           <h3 style={{ margin: '0 0 4px', fontSize: '18px', fontWeight: '600' }}>{title}</h3>
           <p className="small" style={{ margin: '0 0 16px' }}>{desc}</p>

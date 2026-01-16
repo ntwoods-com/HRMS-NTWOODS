@@ -30,7 +30,7 @@ function isActivePath_(pathname, to) {
   return pathname === to || pathname.startsWith(`${to}/`);
 }
 
-export function Sidebar({ collapsed, onToggleCollapsed }) {
+export function Sidebar({ collapsed, onToggleCollapsed, onNavigate }) {
   const { me, role, legacyRole, permissions, canPortal } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -190,7 +190,10 @@ export function Sidebar({ collapsed, onToggleCollapsed }) {
                     onPointerDown={() => prefetch_(it)}
                     aria-label={it.label}
                     aria-current={isActive ? 'page' : undefined}
-                    onClick={() => navigate(it.to)}
+                    onClick={() => {
+                      navigate(it.to);
+                      if (typeof onNavigate === 'function') onNavigate();
+                    }}
                   >
                     <span className="sidebar-linkIcon" aria-hidden="true">
                       <Icon name={it.icon || 'file'} size={collapsed ? 18 : 16} />

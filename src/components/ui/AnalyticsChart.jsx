@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { cn } from '../../utils/cn';
 
 /**
@@ -33,9 +33,7 @@ export function BarChart({ data = [], height = 200, showLabels = true, animated 
                 }}
                 title={`${item.label}: ${item.value}`}
               >
-                {showLabels && item.value > 0 && (
-                  <span className="bar-chart-value">{item.value}</span>
-                )}
+                {showLabels && item.value > 0 && <span className="bar-chart-value">{item.value}</span>}
               </div>
             </div>
           );
@@ -70,7 +68,6 @@ export function LineChart({ data = [], height = 200, showDots = true, showArea =
   const chartWidth = 100;
   const chartHeight = 100;
 
-  // Calculate points
   const points = data.map((item, index) => {
     const x = padding + (index / (data.length - 1 || 1)) * (chartWidth - 2 * padding);
     const y = chartHeight - padding - (item.value / maxValue) * (chartHeight - 2 * padding);
@@ -83,7 +80,6 @@ export function LineChart({ data = [], height = 200, showDots = true, showArea =
   return (
     <div className="chart-container line-chart" style={{ height }}>
       <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="none">
-        {/* Grid lines */}
         {[0, 25, 50, 75, 100].map((percent) => {
           const y = chartHeight - padding - (percent / 100) * (chartHeight - 2 * padding);
           return (
@@ -98,21 +94,10 @@ export function LineChart({ data = [], height = 200, showDots = true, showArea =
           );
         })}
 
-        {/* Area under line */}
-        {showArea && (
-          <path
-            d={areaD}
-            className={cn('line-chart-area', isVisible && 'visible')}
-          />
-        )}
+        {showArea && <path d={areaD} className={cn('line-chart-area', isVisible && 'visible')} />}
 
-        {/* Line */}
-        <path
-          d={pathD}
-          className={cn('line-chart-line', isVisible && 'visible')}
-        />
+        <path d={pathD} className={cn('line-chart-line', isVisible && 'visible')} />
 
-        {/* Dots */}
         {showDots &&
           points.map((point, index) => (
             <circle
@@ -176,7 +161,6 @@ export function DonutChart({ data = [], size = 160, thickness = 20, showLegend =
     <div className="chart-container donut-chart">
       <div className="donut-chart-wrapper">
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-          {/* Background circle */}
           <circle
             cx={size / 2}
             cy={size / 2}
@@ -185,7 +169,6 @@ export function DonutChart({ data = [], size = 160, thickness = 20, showLegend =
             strokeWidth={thickness}
           />
 
-          {/* Segments */}
           {segments.map((segment, index) => (
             <circle
               key={index}
@@ -203,7 +186,6 @@ export function DonutChart({ data = [], size = 160, thickness = 20, showLegend =
             </circle>
           ))}
 
-          {/* Center text */}
           <text x={size / 2} y={size / 2} className="donut-chart-center">
             <tspan x={size / 2} dy="-0.2em" className="donut-chart-total">
               {total}
@@ -236,6 +218,8 @@ export function DonutChart({ data = [], size = 160, thickness = 20, showLegend =
  * Stats card with mini chart
  */
 export function StatCard({ title, value, change, changeType = 'neutral', sparklineData = [], icon }) {
+  const changeIcon = changeType === 'positive' ? '▲' : changeType === 'negative' ? '▼' : '•';
+
   return (
     <div className="stat-card">
       <div className="stat-card-header">
@@ -247,9 +231,7 @@ export function StatCard({ title, value, change, changeType = 'neutral', sparkli
 
       {change !== undefined && (
         <div className={cn('stat-card-change', changeType)}>
-          <span className="stat-card-change-icon">
-            {changeType === 'positive' ? '↑' : changeType === 'negative' ? '↓' : '→'}
-          </span>
+          <span className="stat-card-change-icon">{changeIcon}</span>
           <span>{change}</span>
         </div>
       )}
@@ -273,12 +255,10 @@ export function ProgressBar({ value, max = 100, label, color = 'blue', showValue
     <div className={cn('progress-bar', size)}>
       {label && <span className="progress-bar-label">{label}</span>}
       <div className="progress-bar-track">
-        <div
-          className={cn('progress-bar-fill', color)}
-          style={{ width: `${percent}%` }}
-        />
+        <div className={cn('progress-bar-fill', color)} style={{ width: `${percent}%` }} />
       </div>
       {showValue && <span className="progress-bar-value">{Math.round(percent)}%</span>}
     </div>
   );
 }
+

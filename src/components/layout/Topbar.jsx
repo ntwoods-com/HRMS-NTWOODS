@@ -1,8 +1,9 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
+import { MenuIcon } from '../ui/Icons';
 import { ThemeToggle } from '../ui/ThemeToggle';
 import { NotificationBell } from '../ui/NotificationBell';
 import { GlobalSearch, SearchTrigger } from '../ui/GlobalSearch';
@@ -46,7 +47,7 @@ export function Topbar({ onToggleCollapsed }) {
         <div className="topbar-inner">
           <div className="row" style={{ gap: 10, minWidth: 0 }}>
             <button className="icon-button" type="button" onClick={onToggleCollapsed} aria-label="Toggle sidebar">
-              ≡
+              <MenuIcon size={18} />
             </button>
             <div style={{ minWidth: 0 }}>
               <div className="topbar-title">{pageLabel || 'HRMS'}</div>
@@ -65,7 +66,7 @@ export function Topbar({ onToggleCollapsed }) {
 
             {/* Theme Toggle */}
             <ThemeToggle />
-            
+
             {/* Notifications */}
             <NotificationBell />
 
